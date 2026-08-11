@@ -1,0 +1,47 @@
+cat > .gitignore << 'EOF'
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.next/
+out/
+dist/
+build/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+# Ansible
+*.retry
+inventory/hosts
+
+# Kubernetes / kubeconfig
+kubeconfig
+*.kubeconfig
+
+# Docker
+*.log
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Monitoring data volumes (if run locally)
+monitoring/**/data/
+EOF
