@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "npm run build && next start",
+    "test":  "echo \"no tests yet\" && exit 0",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
