@@ -1,0 +1,59 @@
+services:
+  mongo:
+    image: mongo:4.4
+    container_name: expensy-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - expensy-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: expensy-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "someredispassword"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - expensy-net
+
+  backend:
+    build:
+      context: ./expensy_backend
+    container_name: expensy-backend
+    restart: unless-stopped
+    env_file:
+      - ./expensy_backend/.env
+    ports:
+      - "8706:8706"
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - expensy-net
+
+  frontend:
+    build:
+      context: ./expensy_frontend
+    container_name: expensy-frontend
+    restart: unless-stopped
+    env_file:
+      - ./expensy_frontend/.env.production
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    networks:
+      - expensy-net
+
+networks:
+  expensy-net:
+    driver: bridge
+
+volumes:
+  mongo-data:
+  redis-data:
