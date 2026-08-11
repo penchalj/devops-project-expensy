@@ -16,3 +16,13 @@
 - **Reason:** Fix requires breaking-change version bump (0.35.3). Confirm actual usage of
   next/image optimization in the app before prioritizing.
 - **Tracking:** [ ] Confirm if `sharp`/`next/image` optimization is used; upgrade or remove if unused.
+
+## Infrastructure Notes
+
+### MongoDB version pin (mongo:4.4)
+- **Reason:** Local dev CPU (Intel G4650) lacks AVX instruction support, required by
+  MongoDB 5.0+. Image crash-loops with SIGILL on this hardware.
+- **Scope:** Local development only via docker-compose.
+- **Production consideration:** Cloud VMs (Phase 2+) will use modern instance types with
+  AVX support — production/staging can run mongo:7 or later. Revisit compose file per
+  environment, or use a managed MongoDB service (Atlas) to sidestep this entirely.
