@@ -77,7 +77,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./expensy_backend
-          file: ./expensy_backend/Dockerfile.backend
+          file: ./expensy_backend/Dockerfile
           push: true
           tags: ${{ env.ECR_REGISTRY }}/penchal-expensy-backend:${{ github.sha }}
 
@@ -85,6 +85,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./expensy_frontend
-          file: ./expensy_frontend/Dockerfile.frontend
+          file: ./expensy_frontend/Dockerfile
           push: true
           tags: ${{ env.ECR_REGISTRY }}/penchal-expensy-frontend:${{ github.sha }}
