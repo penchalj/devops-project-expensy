@@ -45,3 +45,5 @@ Thumbs.db
 # Monitoring data volumes (if run locally)
 monitoring/**/data/
 EOF
+ecr-push-policy.json
+github-trust-policy.json
