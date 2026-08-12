@@ -47,3 +47,4 @@ monitoring/**/data/
 EOF
 ecr-push-policy.json
 github-trust-policy.json
+k8s/01-secrets.yaml
