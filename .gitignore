@@ -48,3 +48,7 @@ EOF
 ecr-push-policy.json
 github-trust-policy.json
 k8s/01-secrets.yaml
+*.tfstate
+*.tfstate.backup
+tfplan
+infrastructure/terraform/plan.txt
