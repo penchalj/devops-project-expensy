@@ -11,5 +11,5 @@ variable "vpc_cidr" {
 }
 
 variable "cluster_version" {
-  default = "1.29"
+  default = "1.31"
 }

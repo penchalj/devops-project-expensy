@@ -50,5 +50,6 @@ spec:
   selector:
     app: backend
   ports:
-    - port: 8706
+    - name: http
+      port: 8706
       targetPort: 8706
