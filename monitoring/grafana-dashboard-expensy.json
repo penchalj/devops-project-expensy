@@ -1,0 +1,70 @@
+{
+  "title": "Expensy - Overview",
+  "uid": "expensy-overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pod status (expensy namespace)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(kube_pod_status_phase{namespace=\"expensy\", phase=\"Running\"}) by (pod)", "legendFormat": "{{pod}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Pod restarts (last 1h)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"expensy\"}[1h])", "legendFormat": "{{pod}} / {{container}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "CPU usage by pod",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        { "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"expensy\"}[5m])) by (pod)", "legendFormat": "{{pod}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 4,
+      "title": "Memory usage by pod",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        { "expr": "sum(container_memory_working_set_bytes{namespace=\"expensy\"}) by (pod)", "legendFormat": "{{pod}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 5,
+      "title": "Backend HTTP request rate (requires app /metrics)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "description": "Placeholder — populates once the backend exposes a /metrics endpoint.",
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{namespace=\"expensy\", job=\"expensy-backend\"}[5m])) by (route, status_code)", "legendFormat": "{{route}} [{{status_code}}]" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Node CPU / Memory",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "targets": [
+        { "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "legendFormat": "CPU utilization" },
+        { "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "Memory utilization" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    }
+  ]
+}
