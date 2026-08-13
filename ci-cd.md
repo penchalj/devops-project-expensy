@@ -1,6 +1,6 @@
 # CI/CD Pipeline
 
-This document describes the GitHub Actions pipeline for Expensy, how to configure it, and a known limitation.
+This document describes the GitHub Actions pipeline for Expensy, how to configure it, and its current status.
 
 ## Overview
 
@@ -10,7 +10,9 @@ The pipeline lives at `.github/workflows/ci-cd.yaml` and runs on every push to `
 2. **test** — runs each service's test suite (matrix job, depends on `build`)
 3. **docker-build-push** — authenticates to AWS via OIDC, builds both Docker images, and pushes them to ECR (depends on `test`)
 
-There is currently no automated `deploy` stage — that will be added once the EKS cluster (Phase 4) is provisioned and the manifests (Phase 5) are finalized.
+**All three stages are fully working and green as of run #8.**
+
+There is currently no automated `deploy` stage — Kubernetes manifests (`k8s/`) are applied manually via `kubectl apply -f k8s/` rather than as part of the pipeline. Automating this (e.g. a `deploy` job running `kubectl apply` against the EKS cluster) is a natural next step but was not implemented, since the frontend image also needs to be rebuilt with a fresh `NEXT_PUBLIC_API_URL` build arg whenever the backend's external address changes (see "Known limitation" in the main `README.md`) — automating that safely would need more thought than fits in this pipeline as-is.
 
 ## Required GitHub Secrets
 
@@ -68,25 +70,38 @@ Images are pushed to:
 
 Each image is tagged with the triggering commit's SHA (`${{ github.sha }}`), not `latest`, so every pushed image is traceable back to an exact commit.
 
-## Known Issue: `docker-build-push` fails at OIDC auth
+Note: the frontend image actually running on the cluster (`penchal-expensy-frontend:with-api-url`) was built and pushed manually rather than through this pipeline, since it needed a specific `NEXT_PUBLIC_API_URL` build argument baked in — see the main `README.md` for details.
 
-**Status:** Unresolved, escalated to instructor.
+## Resolved Issue: OIDC authentication (previously blocked)
 
-The `Configure AWS credentials via OIDC` step fails with:
+Earlier runs of `docker-build-push` failed with:
 ```
 Error: Could not assume role with OIDC: Not authorized to perform sts:AssumeRoleWithWebIdentity
 ```
 
-This was investigated thoroughly and ruled out as a configuration error on the project side:
+This was investigated thoroughly at the time and ruled out as a configuration error on the project side:
 
 - ✅ IAM role trust policy verified correct (`aws iam get-role`)
 - ✅ OIDC provider verified registered with correct thumbprint and client ID (`aws iam get-open-id-connect-provider`)
 - ✅ Repository path in trust policy confirmed to exactly match `git remote -v` output (case-sensitive)
-- ❌ CloudTrail shows **zero** `AssumeRoleWithWebIdentity` events matching this role or the `githubusercontent.com` identity provider, across multiple isolated attempts in tightly-scoped time windows — even for a run that failed moments before the CloudTrail query
+- ❌ CloudTrail showed **zero** `AssumeRoleWithWebIdentity` events matching this role or the `githubusercontent.com` identity provider, across multiple isolated attempts in tightly-scoped time windows
 
-The absence of any CloudTrail record — rather than a logged, explicit `Deny` — suggests the call may be blocked before IAM evaluation, which is consistent with an **account or AWS Organizations-level Service Control Policy (SCP)** restricting external OIDC federation. This AWS account is shared across the course cohort (confirmed via pre-existing IAM roles scoped to other students' repos), making an org-level policy a plausible explanation outside of student control.
+The absence of any CloudTrail record — rather than a logged, explicit `Deny` — suggested the call was being blocked before IAM evaluation, consistent with an **account or AWS Organizations-level Service Control Policy (SCP)** restricting external OIDC federation in this shared cohort AWS account.
 
-**Impact:** `build` and `test` stages are unaffected and pass reliably. Only the final image-push step is blocked, meaning images must currently be built and pushed manually if needed for testing:
+**As of run #8 (commit `ef200be`), `docker-build-push` completes successfully.** The underlying restriction appears to have been lifted or resolved on the account side — images now push to ECR automatically on every push to `main`. The root cause of the original block was never confirmed (it resolved before an instructor response came back), but the pipeline has been reliably green since.
+
+## Local verification
+
+Both services' build and test steps can be verified locally before pushing:
+
+```bash
+cd expensy_backend && npm ci && npm run build && npm test
+cd ../expensy_frontend && npm ci && npm run build && npm test
+```
+
+## Manual image build/push (if ever needed)
+
+Since the pipeline handles this automatically now, this is only needed for one-off builds (e.g. the `with-api-url` tag mentioned above):
 
 ```bash
 aws ecr get-login-password --region us-east-1 | \
@@ -95,15 +110,4 @@ aws ecr get-login-password --region us-east-1 | \
 docker build -t 686699774218.dkr.ecr.us-east-1.amazonaws.com/penchal-expensy-backend:manual \
   -f expensy_backend/Dockerfile expensy_backend
 docker push 686699774218.dkr.ecr.us-east-1.amazonaws.com/penchal-expensy-backend:manual
-```
-
-**Next step:** Confirm with the course instructor whether an SCP restricts OIDC federation for this account, or whether an alternative (e.g. long-lived IAM user credentials stored as a GitHub secret) is expected instead.
-
-## Local verification
-
-Before relying on CI, both services' build and test steps can be verified locally:
-
-```bash
-cd expensy_backend && npm ci && npm run build && npm test
-cd ../expensy_frontend && npm ci && npm run build && npm test
 ```
