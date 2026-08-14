@@ -13,6 +13,7 @@ Expensy is a lightweight expense tracker app (Next.js frontend + Express/TypeScr
 - [Deploying to EKS](#deploying-to-eks)
 - [Monitoring](#monitoring)
 - [Security](#security)
+- [Problems & Fixes](#Problems-&-Fixes)
 - [Known limitations](#known-limitations)
 - [Repository structure](#repository-structure)
 
@@ -195,6 +196,81 @@ kubectl port-forward -n monitoring svc/monitoring-grafana 3001:80
 ## Security
 
 IAM least-privilege design, secrets handling, network posture, and known gaps (TLS not yet implemented) are documented in **[SECURITY.md](./SECURITY.md)**.
+
+## Problems & Fixes
+
+Everything below actually happened during this build — no step was skipped or simplified for the writeup. Each entry follows the same shape: what broke, how it was diagnosed, and what fixed it.
+
+### 1. GitHub Actions OIDC authentication failed on every push
+
+**Symptom:** The `docker-build-push` job failed consistently with:
+```
+Error: Could not assume role with OIDC: Not authorized to perform sts:AssumeRoleWithWebIdentity
+```
+
+**Investigation:** Rather than guessing, each piece of the OIDC chain was verified independently:
+- IAM role trust policy checked against `aws iam get-role` — correct
+- OIDC identity provider checked against `aws iam get-open-id-connect-provider` — correct thumbprint, correct client ID
+- Repository path in the trust policy (`repo:penchalj/devops-project-expensy:*`) confirmed to exactly match `git remote -v`, case-sensitive
+
+With every documented piece confirmed correct, the next step was checking whether the call was even reaching AWS. Querying CloudTrail for `AssumeRoleWithWebIdentity` events — across several isolated attempts, including one just seconds after a live failed run — turned up **zero matching events**. Not a logged `Deny`, just... nothing. That absence was the actual signal: the call was being rejected before IAM ever evaluated it, which points to an account or AWS Organizations–level Service Control Policy rather than anything in the role/trust-policy configuration.
+
+**Fix:** Since this pointed to infrastructure outside the project's control (a shared, cohort-wide AWS account), the finding was documented with the full evidence trail and escalated rather than "fixed" by guessing at workarounds. The pipeline began passing on its own days later — consistent with an account-level restriction being adjusted upstream. `build` and `test` were unaffected throughout; only the final image-push step was blocked.
+
+**Why it mattered:** This is the difference between "it doesn't work, not sure why" and a documented, ruled-out root cause with evidence — the kind of trail that makes it fast for whoever owns the account to act on.
+
+---
+
+### 2. Kubernetes PersistentVolumeClaims stuck in `Pending`
+
+**Symptom:** After deploying MongoDB and Redis, their PVCs sat in `Pending` indefinitely. `kubectl describe pvc` showed:
+```
+FailedBinding: no persistent volumes available for this claim and no storage class is set
+```
+
+**Investigation:** A `StorageClass` named `gp2` did exist on the cluster — but its provisioner (`kubernetes.io/aws-ebs`) is part of Kubernetes' legacy in-tree AWS EBS support, which was removed in Kubernetes 1.23+. Since this cluster runs 1.31, that StorageClass was inert. The actual gap: a cluster provisioned via raw Terraform (rather than `eksctl`) doesn't install the **EBS CSI driver** by default, and without it there's no way to dynamically provision the underlying EBS volumes the claims need.
+
+**Fix:**
+1. Associated an IAM OIDC provider with the *cluster itself* (a separate OIDC setup from the GitHub Actions one — cluster-scoped, for IRSA)
+2. Created a scoped IAM role for the EBS CSI driver via `eksctl create iamserviceaccount`
+3. Installed the driver as an EKS add-on, pointed at that role
+4. Defined a working `gp3` StorageClass and set it as cluster default
+
+Both PVCs bound within seconds of the StorageClass being created.
+
+**Why it mattered:** This wasn't a typo or a missing YAML field — it required understanding *why* a resource that looked correctly configured (`gp2` existed, PVCs referenced valid claims) still failed, which meant reasoning about Kubernetes version history and how EKS clusters differ depending on how they're provisioned.
+
+---
+
+### 3. LoadBalancer stuck in `<pending>` for 18+ minutes
+
+**Symptom:** The frontend's `Service` (`type: LoadBalancer`) never received an external IP. `kubectl describe svc` revealed the real error, repeated on every reconcile attempt:
+```
+TooManyLoadBalancers: Exceeded quota of account 686699774218
+```
+
+**Investigation:** This AWS account is shared across an entire course cohort. Querying existing load balancers directly (`aws elbv2 describe-load-balancers`) showed 5 already in use — clearly named after other students' projects, not anything created by this one. The account-wide ELB quota was simply exhausted by other people's active work.
+
+**Fix:** Rather than blocking on a quota increase that wasn't in this project's control, `NodePort` was used as a working interim exposure method — no ELB required, reachable via a node's public IP plus a corresponding security-group rule opened for the NodePort range. When the quota later cleared on its own, the frontend was switched back to `LoadBalancer`.
+
+**Why it mattered:** Recognizing a shared-resource contention problem versus a configuration bug — and having a working fallback ready rather than just waiting — kept the project moving without depending on someone else's timeline.
+
+---
+
+### 4. Prometheus discovered the app's Services but never scraped them
+
+**Symptom:** `ServiceMonitor` objects for the backend and frontend existed, matched no errors in the Prometheus Operator logs, and RBAC was fully open (`serviceMonitorSelector: {}`, `serviceMonitorNamespaceSelector: {}`). Yet `/targets` in the Prometheus UI showed nothing from the app — only the built-in cluster jobs (`node_exporter`, `kube-state-metrics`, etc.).
+
+**Investigation:** Working backward from Prometheus's actual scrape config (`/api/v1/status/config`) confirmed the `expensy-backend` and `expensy-frontend` jobs were registered — so the ServiceMonitors *were* being read. The next layer down, service discovery's dropped-targets list, showed the backend and frontend endpoints were being **discovered and then dropped** during relabeling. Comparing the ServiceMonitor's `selector.matchLabels: app: backend` against the actual Kubernetes `Service` objects revealed the gap: the Services had a `spec.selector` (which picks the *pods* to route to) but no `metadata.labels` on the Service object itself — and it's the latter that a ServiceMonitor's selector matches against.
+
+**Fix:**
+```bash
+kubectl patch svc backend -n expensy -p '{"metadata":{"labels":{"app":"backend"}}}'
+kubectl patch svc frontend -n expensy -p '{"metadata":{"labels":{"app":"frontend"}}}'
+```
+Confirmed via a live re-check of `/targets` — both services immediately went active (returning `404` on `/metrics`, expected, since that endpoint isn't implemented yet — but proof the network path and discovery pipeline were fully correct).
+
+**Why it mattered:** Every layer *looked* fine in isolation — no errors, correct RBAC, matching-looking selectors. Finding the actual gap meant understanding the difference between a Service's `spec.selector` (pod routing) and its `metadata.labels` (what other objects match against) — a subtle but common Kubernetes distinction.
 
 ## Known limitations
 
