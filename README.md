@@ -13,7 +13,7 @@ Expensy is a lightweight expense tracker app (Next.js frontend + Express/TypeScr
 - [Deploying to EKS](#deploying-to-eks)
 - [Monitoring](#monitoring)
 - [Security](#security)
-- [Problems & Fixes](#Problems-&-Fixes)
+- [Problems & Fixes](#problems--fixes)
 - [Known limitations](#known-limitations)
 - [Repository structure](#repository-structure)
 
@@ -297,3 +297,4 @@ devops-project-expensy/
 ├── CI-CD.md
 ├── SECURITY.md
 └── README.md              # this file
+```
