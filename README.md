@@ -1,8 +1,17 @@
 # Expensy — End-to-End DevOps Deployment
 
+[![CI/CD](https://github.com/penchalj/devops-project-expensy/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/penchalj/devops-project-expensy/actions/workflows/ci-cd.yaml)
+
 Expensy is a lightweight expense tracker app (Next.js frontend + Express/TypeScript backend, MongoDB + Redis) deployed with a full DevOps pipeline: containerized, tested and pushed via CI/CD, provisioned on AWS EKS with Terraform, and monitored with Prometheus/Grafana.
 
-**Status: fully deployed and verified end-to-end on live AWS infrastructure** — see [Live deployment](#deploying-to-eks) below.
+**Status: fully deployed and verified end-to-end on live AWS infrastructure.**
+
+<!--
+DEMO: replace this line with an embedded GIF or screenshot once captured — see
+"Capturing the demo" section below for exact steps. Suggested path: docs/images/demo.gif
+Example once ready:
+![Expensy demo](docs/images/demo.gif)
+-->
 
 ## Table of contents
 
@@ -19,23 +28,15 @@ Expensy is a lightweight expense tracker app (Next.js frontend + Express/TypeScr
 
 ## Architecture
 
-```
-                    ┌─────────────┐
-   Browser  ───────▶│  frontend   │  (Next.js, 2 replicas)
-                    └──────┬──────┘
-                           │ NEXT_PUBLIC_API_URL
-                           ▼
-                    ┌─────────────┐
-                    │   backend   │  (Express/TS, 2 replicas)
-                    └──────┬──────┘
-                    ┌──────┴──────┐
-                    ▼             ▼
-              ┌──────────┐  ┌──────────┐
-              │  MongoDB │  │  Redis   │
-              └──────────┘  └──────────┘
-```
+**Component & functional diagram** — how requests flow from the browser through to storage, and how CI/CD ships new images:
 
-All four services run as Kubernetes Deployments on an EKS cluster, alongside a Prometheus/Grafana monitoring stack.
+![Component and functional diagram](docs/images/component-diagram.png)
+
+**AWS infrastructure diagram** — the underlying VPC, EKS cluster, and supporting AWS resources:
+
+![AWS infrastructure diagram](docs/images/aws-infrastructure-diagram.png)
+
+All four application services run as Kubernetes Deployments on an EKS cluster, alongside a Prometheus/Grafana monitoring stack.
 
 ## Local development
 
@@ -292,6 +293,7 @@ devops-project-expensy/
 │   └── terraform/         # VPC, EKS cluster, IAM roles
 ├── k8s/                   # Kubernetes manifests
 ├── monitoring/            # Prometheus/Grafana Helm values, dashboards
+├── docs/images/           # README diagrams and demo media
 ├── .github/workflows/     # CI/CD pipeline
 ├── docker-compose.yml     # Local multi-service orchestration
 ├── CI-CD.md
