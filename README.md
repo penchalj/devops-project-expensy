@@ -16,6 +16,7 @@ Example once ready:
 ## Table of contents
 
 - [Architecture](#architecture)
+- [Screenshots](#screenshots)
 - [Local development](#local-development)
 - [Docker / Docker Compose](#docker--docker-compose)
 - [CI/CD](#cicd)
@@ -37,6 +38,20 @@ Example once ready:
 ![AWS infrastructure diagram](docs/images/aws-infrastructure-diagram.png)
 
 All four application services run as Kubernetes Deployments on an EKS cluster, alongside a Prometheus/Grafana monitoring stack.
+
+## Screenshots
+
+**Live application**
+![Expensy app running](docs/images/live-app.jpg)
+
+**Grafana — live cluster metrics**
+![Grafana dashboard](docs/images/grafana-dashboard.jpg)
+
+**CI/CD pipeline — passing**
+![GitHub Actions run](docs/images/ci-cd.jpg)
+
+**Kubernetes — all pods healthy**
+![kubectl get pods](docs/images/kubectl-pods.jpg)
 
 ## Local development
 
